@@ -38,21 +38,43 @@ def reconstruction_impl(distance, doubleplane, energy, erel, neutron, physics, o
     pario = ROOT.FairParRootFileIo(False)
     pario.open(parfile)
     rtdb.setFirstInput(pario)
-#     pario2 = ROOT.FairParRootFileIo(False)
-#     pario2.open(cutfile)
-#     rtdb.setSecondInput(pario2)
+    # pario2 = ROOT.FairParRootFileIo(False)
+    # pario2.open(cutfile)
+    # rtdb.setSecondInput(pario2)
 
     # Fixed Multiplicty
     run.AddTask(ROOT.R3BNeulandMultiplicityFixed(neutron, "NeulandMultiplicityFixed"))
     
+    # Cheating Multiplicity
+    run.AddTask(ROOT.R3BNeulandMultiplicityCheat("NeulandPrimaryHits", "NeulandMultiplicityCheat"))
+    
     # Fixed Multiplicity + RValue Neutron Reco
     run.AddTask(ROOT.R3BNeulandNeutronsRValue(energy, "NeulandMultiplicityFixed", "NeulandClusters", "NeulandNeutronsFixedRValue"))
     run.AddTask(ROOT.R3BNeulandNeutronReconstructionMon("NeulandNeutronsFixedRValue", "NeulandRecoFixedRValue"))
+    
+    # Cheating Multiplicity + RValue Neutron Reco
+    run.AddTask(ROOT.R3BNeulandNeutronsRValue(energy, "NeulandMultiplicityCheat", "NeulandClusters", "NeulandNeutronsCheatRValue"))
+    run.AddTask(ROOT.R3BNeulandNeutronReconstructionMon("NeulandNeutronsCheatRValue", "NeulandRecoCheatRValue"))
+    
+    # Fixed Multiplicty + Scikit-Learn Reco, see
+    # https://github.com/janmayer/NeuLAND-reconstruction-ml/tree/master/clusterfeature
+    mlpkl = "15m_12dp_500AMeV_500keV_4n_AdaBoostClassifier.pkl"
+    mltsk = ROOT.R3BNeulandNeutronsScikit(mlpkl, "NeulandMultiplicityFixed", "NeulandClusters", "NeulandNeutronsFixedAdaBoost")
+    mltsk.SetMinProb(0.49)
+    run.AddTask(mltsk)
+    run.AddTask(ROOT.R3BNeulandNeutronReconstructionMon("NeulandNeutronsFixedAdaBoost", "NeulandRecoFixedAdaBoost"))
 
+    # Cheating Multiplicty + Scikit-Learn Reco, see
+    # https://github.com/janmayer/NeuLAND-reconstruction-ml/tree/master/clusterfeature
+    mlpkl2 = "15m_12dp_500AMeV_500keV_4n_AdaBoostClassifier.pkl"
+    mltsk2 = ROOT.R3BNeulandNeutronsScikit(mlpkl2, "NeulandMultiplicityCheat", "NeulandClusters", "NeulandNeutronsCheatAdaBoost")
+    mltsk2.SetMinProb(0.49)
+    run.AddTask(mltsk2)
+    run.AddTask(ROOT.R3BNeulandNeutronReconstructionMon("NeulandNeutronsCheatAdaBoost", "NeulandRecoCheatAdaBoost"))
+    
     # Perfect Reco
-    run.AddTask(ROOT.R3BNeulandMultiplicityCheat("NeulandPrimaryHits", "NeulandMultiplicityCheat"))
-    run.AddTask(ROOT.R3BNeulandNeutronsCheat("NeulandMultiplicityCheat", "NeulandPrimaryHits", "NeulandNeutronsCheat"))
-    run.AddTask(ROOT.R3BNeulandNeutronReconstructionMon("NeulandNeutronsCheat", "NeulandRecoCheat"))
+    run.AddTask(ROOT.R3BNeulandNeutronsCheat("NeulandMultiplicityCheat", "NeulandPrimaryHits", "NeulandNeutronsCheatCheat"))
+    run.AddTask(ROOT.R3BNeulandNeutronReconstructionMon("NeulandNeutronsCheatCheat", "NeulandRecoCheatCheat"))
 
     run.Init()
     run.Run(0, 0)
